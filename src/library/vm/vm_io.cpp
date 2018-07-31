@@ -18,6 +18,8 @@ Author: Leonardo de Moura
 #endif
 #ifdef __linux__
 #include <linux/limits.h>
+#include <sys/socket.h>
+#include <sys/un.h>
 #endif
 #include <util/unit.h>
 #include "util/sstream.h"
@@ -93,6 +95,24 @@ static vm_obj to_obj(handle_ref && h) {
     return mk_vm_external(new (get_vm_allocator().allocate(sizeof(vm_handle))) vm_handle(std::move(h)));
 }
 
+struct vm_socket : public vm_external {
+    int fd;
+    vm_socket(int fd) {this->fd = fd;}
+    virtual ~vm_socket() {}
+    virtual void dealloc() override { this->~vm_socket(); get_vm_allocator().deallocate(sizeof(vm_socket), this); }
+    virtual vm_external * clone(vm_clone_fn const &) override { return new vm_socket(fd); }
+    virtual vm_external * ts_clone(vm_clone_fn const &) override { lean_unreachable(); }
+};
+
+static int socket_to_fd(vm_obj const & o) {
+    lean_vm_check(dynamic_cast<vm_socket*>(to_external(o)));
+    return static_cast<vm_socket*>(to_external(o))->fd;
+}
+
+static vm_obj mk_socket(int fd) {
+    return mk_vm_external(new (get_vm_allocator().allocate(sizeof(vm_socket))) vm_socket(fd));
+}
+
 struct vm_child : public vm_external {
     std::shared_ptr<child> m_child;
     vm_child(std::shared_ptr<child> && h):m_child(std::move(h)) {}
@@ -126,6 +146,22 @@ char const * to_c_io_mode(vm_obj const & mode, vm_obj const & bin) {
     }
     lean_vm_check(false);
     lean_unreachable();
+}
+
+static vm_obj net_mk_socket_handle(vm_obj const & fname, vm_obj const &) {
+    int fd = socket(AF_UNIX, SOCK_STREAM, 0);
+    struct sockaddr_un addr;
+    memset(&addr, 0, sizeof(addr));
+    addr.sun_family = AF_UNIX;
+    strcpy(addr.sun_path, to_string(fname).c_str());
+    if (fd != -1) {
+        int ret = connect(fd, (struct sockaddr*) &addr, sizeof(addr));
+        if (ret != -1)
+            return mk_io_result(mk_socket(fd));
+        else
+            return mk_io_failure(sstream() << "failed to connect UNIX socket '" << to_string(fname) << "'");
+    } else
+        return mk_io_failure(sstream() << "failed to open UNIX socket '" << to_string(fname) << "'");
 }
 
 /* (mk_file_handle : string → io.mode → bool → m io.error handle) */
@@ -187,6 +223,22 @@ static vm_obj fs_close(vm_obj const & h, vm_obj const &) {
 
 static vm_obj mk_buffer(parray<vm_obj> const & a) {
     return mk_vm_pair(mk_vm_nat(a.size()), to_obj(a));
+}
+
+static vm_obj net_recv(vm_obj const & h, vm_obj const & n, vm_obj const &) {
+    int fd = socket_to_fd(h);
+    buffer<char> tmp;
+    unsigned num = force_to_unsigned(n);
+    tmp.resize(num, 0);
+    ssize_t sz = recv(fd, tmp.data(), num, /* 0 */ MSG_WAITALL);
+    if (sz == -1) {
+        return mk_io_failure("recv failed");
+    }
+    parray<vm_obj> r;
+    for (ssize_t i = 0; i < sz; i++) {
+        r.push_back(mk_vm_simple(static_cast<unsigned char>(tmp[i])));
+    }
+    return mk_io_result(mk_buffer(r));
 }
 
 static vm_obj fs_read(vm_obj const & h, vm_obj const & n, vm_obj const &) {
@@ -262,6 +314,12 @@ static vm_obj fs_stdout(vm_obj const &) {
 
 static vm_obj fs_stderr(vm_obj const &) {
     return mk_io_result(to_obj(std::make_shared<handle>(stderr)));
+}
+
+static vm_obj monad_io_net_system_impl () {
+    return mk_vm_constructor(0, {
+        mk_native_closure(net_mk_socket_handle),
+        mk_native_closure(net_recv)});
 }
 
 /*
@@ -579,6 +637,7 @@ void initialize_vm_io() {
     DECLARE_VM_BUILTIN(name("io_core"), io_core);
     DECLARE_VM_BUILTIN(name("monad_io_impl"), monad_io_impl);
     DECLARE_VM_BUILTIN(name("monad_io_terminal_impl"), monad_io_terminal_impl);
+    DECLARE_VM_BUILTIN(name("monad_io_net_system_impl"), monad_io_net_system_impl);
     DECLARE_VM_BUILTIN(name("monad_io_file_system_impl"), monad_io_file_system_impl);
     DECLARE_VM_BUILTIN(name("monad_io_environment_impl"), monad_io_environment_impl);
     DECLARE_VM_BUILTIN(name("monad_io_process_impl"), monad_io_process_impl);

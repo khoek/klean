@@ -14,6 +14,7 @@ rand_nat
 
 @[instance] constant monad_io_impl             : monad_io io_core
 @[instance] constant monad_io_terminal_impl    : monad_io_terminal io_core
+@[instance] constant monad_io_net_system_impl  : monad_io_net_system io_core
 @[instance] constant monad_io_file_system_impl : monad_io_file_system io_core
 @[instance] constant monad_io_environment_impl : monad_io_environment io_core
 @[instance] constant monad_io_process_impl     : monad_io_process io_core
@@ -75,8 +76,14 @@ put_str ∘ to_string $ s
 def print_ln {α} [has_to_string α] (s : α) : io unit :=
 print s >> put_str "\n"
 
+def socket : Type :=
+monad_io.socket io_core
+
 def handle : Type :=
 monad_io.handle io_core
+
+def mk_socket_handle (s : string) : io socket :=
+monad_io_net_system.mk_socket_handle io_core s
 
 def mk_file_handle (s : string) (m : mode) (bin : bool := ff) : io handle :=
 monad_io_file_system.mk_file_handle io_core s m bin
@@ -104,6 +111,12 @@ def set_cwd (cwd : string) : io unit :=
 monad_io_environment.set_cwd io_core cwd
 
 end env
+
+namespace net
+def recv : socket → nat → io char_buffer :=
+monad_io_net_system.recv
+
+end net
 
 namespace fs
 def is_eof : handle → io bool :=

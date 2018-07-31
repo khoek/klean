@@ -40,6 +40,7 @@ class monad_io (m : Type → Type → Type) :=
 (fail     : Π e α, e → m e α)
 (iterate  : Π e α, α → (α → m e (option α)) → m e α)
 -- Primitive Types
+(socket   : Type)
 (handle   : Type)
 
 class monad_io_terminal (m : Type → Type → Type) :=
@@ -47,7 +48,12 @@ class monad_io_terminal (m : Type → Type → Type) :=
 (get_line     : m io.error string)
 (cmdline_args : list string)
 
+open monad_io (socket)
 open monad_io (handle)
+
+class monad_io_net_system (m : Type → Type → Type) [monad_io m] :=
+(mk_socket_handle : string → m io.error (socket m))
+(recv             : (socket m) → nat → m io.error char_buffer)
 
 class monad_io_file_system (m : Type → Type → Type) [monad_io m] :=
 /- Remark: in Haskell, they also provide  (Maybe TextEncoding) and  NewlineMode -/
