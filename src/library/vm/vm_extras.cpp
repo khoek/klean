@@ -7,8 +7,11 @@ Author: Keeley Hoek
 #include <cstdio>
 #include <vector>
 #include "library/vm/vm_nat.h"
+#include "library/vm/vm_list.h"
+#include "library/vm/vm_array.h"
 #include "library/vm/vm_io.h"
 #include "library/vm/vm_extras.h"
+#include "library/vm/lib_decent.h"
 
 namespace lean {
 
@@ -47,10 +50,65 @@ static void install_extra_ios() {
 
 //Pure function declarations
 
+//Helper function, expects a list of arrays of naturals with each array of length dim
+static std::vector<double *> * unpack_vector_list(unsigned dim, vm_obj const & _vlist) {
+    list<parray<vm_obj>> vlist = to_list_array(_vlist);
+
+    //FIXME it's a shame that it is better to duplicate the vector list, because
+    //parray isn't just an array.
+    std::vector<double *> *vects = new std::vector<double *>();
+
+    for(list<parray<vm_obj>>::iterator it = vlist.begin(); it != vlist.end(); it++) {
+        double *v = new double[dim];
+        for(unsigned i = 0; i < dim; i++) {
+            v[i] = (double) force_to_unsigned((*it)[i]);
+        }
+        vects->push_back(v);
+    }
+    return vects;
+}
+
+static void delete_vector_list(std::vector<double *> *vl) {
+    for(std::vector<double *>::iterator it = vl->begin(); it != vl->end(); it++) {
+        delete *it;
+    }
+    delete vl;
+}
+
+//FIXME all of this same info is passed on the stack. Is that okay?
+double plane_obj_func(uint32_t dim, void *data, double *x) {
+    std::vector<double *> **v = (std::vector<double *> **) data;
+    std::vector<double *> *va = v[0];
+    std::vector<double *> *vb = v[1];
+
+    //FIXME use the points in set va, and the points in set vb, to compute the objective
+    //function for the gradient decent algorithm. x is the current state
+
+    return 1.0;
+}
+
 static vm_obj extras_find_separating_hyperplane(vm_obj const & _dim,
-    vm_obj const & _vects) {
-    size_t dim = force_to_size_t(_dim);
-    fprintf(stderr, "FIXME Find separating hyperpane!");
+    vm_obj const & _vlist_a, vm_obj const & _vlist_b) {
+    unsigned dim = force_to_unsigned(_dim);
+
+    std::vector<double *> *v[2];
+    v[0] = unpack_vector_list(dim, _vlist_a);
+    v[1] = unpack_vector_list(dim, _vlist_b);
+
+    //FIXME me set this to the initial state of the plane
+    double *x0 = new double[dim]; //this should be twice the size or something?
+    memset(x0, 0, sizeof(double[dim]));
+
+    int32_t ret = gradient_decent(dim, x0, plane_obj_func, v);
+    if(ret == -1) {
+        throw exception("gradient_decent did not converge");
+    }
+
+    delete_vector_list(v[0]);
+    delete_vector_list(v[1]);
+
+    //FIXME return a pair of(? or just one? gotta return a point on the plane too right?)
+    //arrays of length dim
     return mk_vm_nat(dim);
 }
 
