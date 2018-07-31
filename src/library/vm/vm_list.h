@@ -7,6 +7,7 @@ Author: Leonardo de Moura
 #pragma once
 #include "kernel/expr.h"
 #include "library/vm/vm.h"
+#include "library/vm/vm_nat.h"
 
 namespace lean {
 list<name> to_list_name(vm_obj const & o);
@@ -54,6 +55,10 @@ list<A> to_list(vm_obj const & o, F const & fn) {
     } else {
         lean_unreachable();
     }
+}
+
+static __attribute__((unused)) list<unsigned> to_list_unsigned(vm_obj const & obj) {
+    return to_list<unsigned>(obj, [](vm_obj const & o) { return force_to_unsigned(o, 0); });
 }
 
 void initialize_vm_list();

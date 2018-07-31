@@ -5,7 +5,6 @@ Released under Apache 2.0 license as described in the file LICENSE.
 Author: Leonardo de Moura
 */
 #include "library/vm/vm_list.h"
-#include "library/vm/vm_nat.h"
 #include "library/tactic/occurrences.h"
 
 namespace lean {
@@ -16,10 +15,6 @@ bool occurrences::contains(unsigned occ_idx) const {
     case Neg: return std::find(m_occs.begin(), m_occs.end(), occ_idx) == m_occs.end();
     }
     lean_unreachable();
-}
-
-static list<unsigned> to_list_unsigned(vm_obj const & occs) {
-    return to_list<unsigned>(occs, [](vm_obj const & o) { return force_to_unsigned(o, 0); });
 }
 
 /*
