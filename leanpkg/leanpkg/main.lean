@@ -14,9 +14,12 @@ io.fs.close h
 
 def read_manifest : io manifest := do
 m ← manifest.from_file leanpkg_toml_fn,
-when (m.lean_version ≠ lean_version_string) $
-  io.print_ln $ "\nWARNING: Lean version mismatch: installed version is " ++ lean_version_string
-     ++ ", but package requires " ++ m.lean_version ++ "\n",
+-- FIXME renable this when we want to parse out the colon in things like "khoek/klean:3.4.1"
+-- to check the version (branch) ID.
+--
+-- when (m.lean_version ≠ lean_version_string) $
+--   io.print_ln $ "\nWARNING: Lean version mismatch: installed version is " ++ lean_version_string
+--      ++ ", but package requires " ++ m.lean_version ++ "\n",
 return m
 
 def write_manifest (d : manifest) (fn := leanpkg_toml_fn) : io unit :=
