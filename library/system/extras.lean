@@ -14,9 +14,8 @@ namespace extras
 def greet : io unit := vm_extra_io.greet io_core
 
 -- Functions which do not use IO types are just declared like this.
---FIXME this should return (array dim ℕ) × (array dim ℕ)
 constant find_separating_hyperplane {dim : ℕ} (a_vects : list (array dim ℕ))
-    (b_vects : list (array dim ℕ)) : ℕ
+    (b_vects : list (array dim ℕ)) : (array dim ℤ) × ℤ
 -- FIXME use an honest, raw array-backed data type (the built-in array/parray isn't
 -- do this and frankly that seems really pointless)
 
