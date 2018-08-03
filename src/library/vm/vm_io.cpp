@@ -16,7 +16,7 @@ Author: Leonardo de Moura
 #else
 #include <unistd.h>
 #endif
-#ifdef __linux__
+#if defined(__linux__) || defined(__APPLE__)
 #include <linux/limits.h>
 #include <sys/socket.h>
 #include <sys/un.h>
