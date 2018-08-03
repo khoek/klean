@@ -54,6 +54,7 @@ open monad_io (handle)
 class monad_io_net_system (m : Type → Type → Type) [monad_io m] :=
 (mk_socket_handle : string → m io.error (socket m))
 (recv             : (socket m) → nat → m io.error char_buffer)
+(send             : (socket m) → char_buffer → m io.error unit)
 
 class monad_io_file_system (m : Type → Type → Type) [monad_io m] :=
 /- Remark: in Haskell, they also provide  (Maybe TextEncoding) and  NewlineMode -/

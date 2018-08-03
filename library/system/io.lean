@@ -116,6 +116,9 @@ namespace net
 def recv : socket → nat → io char_buffer :=
 monad_io_net_system.recv
 
+def send : socket → char_buffer → io unit :=
+monad_io_net_system.send
+
 end net
 
 namespace fs

@@ -240,6 +240,21 @@ static vm_obj net_recv(vm_obj const & h, vm_obj const & n, vm_obj const &) {
     return mk_io_result(mk_buffer(r));
 }
 
+static vm_obj net_send(vm_obj const & h, vm_obj const & b, vm_obj const &) {
+    int fd = socket_to_fd(h);
+    buffer<char> tmp;
+    parray<vm_obj> const & a = to_array(cfield(b, 1));
+    size_t sz = a.size();
+    for (size_t i = 0; i < sz; i++) {
+        tmp.push_back(static_cast<unsigned char>(cidx(a[i])));
+    }
+    ssize_t ret = send(fd, tmp.data(), sz, 0);
+    if (ret == -1) {
+        return mk_io_failure("send failed");
+    }
+    return mk_io_result(mk_vm_unit());
+}
+
 static vm_obj fs_read(vm_obj const & h, vm_obj const & n, vm_obj const &) {
     handle_ref const & href = to_handle(h);
     if (href->is_closed()) return mk_handle_has_been_closed_error();
@@ -318,7 +333,8 @@ static vm_obj fs_stderr(vm_obj const &) {
 static vm_obj monad_io_net_system_impl () {
     return mk_vm_constructor(0, {
         mk_native_closure(net_mk_socket_handle),
-        mk_native_closure(net_recv)});
+        mk_native_closure(net_recv),
+        mk_native_closure(net_send)});
 }
 
 /*
