@@ -17,7 +17,6 @@ Author: Leonardo de Moura
 #include <unistd.h>
 #endif
 #if defined(__linux__) || defined(__APPLE__)
-#include <linux/limits.h>
 #include <sys/socket.h>
 #include <sys/un.h>
 #endif
