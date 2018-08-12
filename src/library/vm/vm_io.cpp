@@ -147,20 +147,22 @@ char const * to_c_io_mode(vm_obj const & mode, vm_obj const & bin) {
     lean_unreachable();
 }
 
-static vm_obj net_mk_socket_handle(vm_obj const & fname, vm_obj const &) {
+vm_obj socket_mk_handle(const char *fname) {
     int fd = socket(AF_UNIX, SOCK_STREAM, 0);
     struct sockaddr_un addr;
     memset(&addr, 0, sizeof(addr));
     addr.sun_family = AF_UNIX;
-    strcpy(addr.sun_path, to_string(fname).c_str());
+    strcpy(addr.sun_path, fname);
     if (fd != -1) {
         int ret = connect(fd, (struct sockaddr*) &addr, sizeof(addr));
         if (ret != -1)
             return mk_io_result(mk_socket(fd));
-        else
-            return mk_io_failure(sstream() << "failed to connect UNIX socket '" << to_string(fname) << "'");
-    } else
-        return mk_io_failure(sstream() << "failed to open UNIX socket '" << to_string(fname) << "'");
+    }
+    return mk_io_failure(sstream() << "failed to open UNIX socket '" << fname << "'");
+}
+
+static vm_obj net_mk_socket_handle(vm_obj const & fname, vm_obj const &) {
+    return socket_mk_handle(to_string(fname).c_str());
 }
 
 /* (mk_file_handle : string → io.mode → bool → m io.error handle) */
@@ -224,10 +226,8 @@ static vm_obj mk_buffer(parray<vm_obj> const & a) {
     return mk_vm_pair(mk_vm_nat(a.size()), to_obj(a));
 }
 
-static vm_obj net_recv(vm_obj const & h, vm_obj const & n, vm_obj const &) {
-    int fd = socket_to_fd(h);
+vm_obj socket_recv(int fd, ssize_t num) {
     buffer<char> tmp;
-    unsigned num = force_to_unsigned(n);
     tmp.resize(num, 0);
     ssize_t sz = recv(fd, tmp.data(), num, /* 0 */ MSG_WAITALL);
     if (sz == -1) {
@@ -240,10 +240,8 @@ static vm_obj net_recv(vm_obj const & h, vm_obj const & n, vm_obj const &) {
     return mk_io_result(mk_buffer(r));
 }
 
-static vm_obj net_send(vm_obj const & h, vm_obj const & b, vm_obj const &) {
-    int fd = socket_to_fd(h);
+vm_obj socket_send(int fd, parray<vm_obj> const & a) {
     buffer<char> tmp;
-    parray<vm_obj> const & a = to_array(cfield(b, 1));
     size_t sz = a.size();
     for (size_t i = 0; i < sz; i++) {
         tmp.push_back(static_cast<unsigned char>(cidx(a[i])));
@@ -253,6 +251,18 @@ static vm_obj net_send(vm_obj const & h, vm_obj const & b, vm_obj const &) {
         return mk_io_failure("send failed");
     }
     return mk_io_result(mk_vm_unit());
+}
+
+static vm_obj net_recv(vm_obj const & h, vm_obj const & n, vm_obj const &) {
+    int fd = socket_to_fd(h);
+    unsigned num = force_to_unsigned(n);
+    return socket_recv(fd, num);
+}
+
+static vm_obj net_send(vm_obj const & h, vm_obj const & b, vm_obj const &) {
+    int fd = socket_to_fd(h);
+    parray<vm_obj> const & a = to_array(cfield(b, 1));
+    return socket_send(fd, a);
 }
 
 static vm_obj fs_read(vm_obj const & h, vm_obj const & n, vm_obj const &) {

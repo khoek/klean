@@ -35,10 +35,16 @@ Author: Leonardo de Moura
 #include "library/vm/vm_list.h"
 #include "library/vm/vm_option.h"
 #include "library/vm/vm_io.h"
+#include "library/vm/vm_array.h"
 #include "library/vm/interaction_state_imp.h"
 #include "library/compiler/vm_compiler.h"
 #include "library/tactic/tactic_state.h"
 #include "library/tactic/simp_lemmas.h"
+
+#if defined(__linux__) || defined(__APPLE__)
+#include <sys/socket.h>
+#include <sys/un.h>
+#endif
 
 namespace lean {
 /* is_ts_safe is required by the interaction_state implementation. */
@@ -1026,6 +1032,69 @@ vm_obj tactic_frozen_local_instances(vm_obj const & s0) {
         return tactic::mk_success(mk_vm_none(), s);
     }
 }
+struct vm_debug_handle : public vm_external {
+    int fd;
+    vm_debug_handle(int fd) {this->fd = fd;}
+    virtual ~vm_debug_handle() {}
+    virtual void dealloc() override { this->~vm_debug_handle(); get_vm_allocator().deallocate(sizeof(vm_debug_handle), this); }
+    virtual vm_external * clone(vm_clone_fn const &) override { return new vm_debug_handle(fd); }
+    virtual vm_external * ts_clone(vm_clone_fn const &) override { lean_unreachable(); }
+};
+
+static int debug_handle_to_fd(vm_obj const & o) {
+    lean_vm_check(dynamic_cast<vm_debug_handle*>(to_external(o)));
+    return static_cast<vm_debug_handle*>(to_external(o))->fd;
+}
+
+static vm_obj mk_vm_debug_handle(int fd) {
+    return mk_vm_external(new (get_vm_allocator().allocate(sizeof(vm_debug_handle))) vm_debug_handle(fd));
+}
+
+vm_obj tactic_debug_mk_handle(vm_obj const & _token, vm_obj const & s) {
+    std::string token = to_string(_token);
+    std::string path = token; //FIXME add an envvar prefix
+
+    int fd = socket(AF_UNIX, SOCK_STREAM, 0);
+    struct sockaddr_un addr;
+    memset(&addr, 0, sizeof(addr));
+    addr.sun_family = AF_UNIX;
+    strcpy(addr.sun_path, path.c_str());
+    if (fd != -1) {
+        int ret = connect(fd, (struct sockaddr*) &addr, sizeof(addr));
+        if (ret != -1)
+            return tactic::mk_success(mk_vm_debug_handle(fd), tactic::to_state(s));
+    }
+
+    char *full_path = realpath(".", NULL);
+    if(!full_path) {
+        full_path = ".";
+    }
+
+    return tactic::mk_exception((std::string("failed to open UNIX socket '") + std::string(full_path) + std::string("/") + std::string(path) + std::string("'")).c_str(), tactic::to_state(s));
+}
+
+vm_obj tactic_debug_handle_publish_raw(vm_obj const & h, vm_obj const & _msg, vm_obj const & s) {
+    int fd = debug_handle_to_fd(h);
+    parray<vm_obj> const & a = to_array(cfield(_msg, 1));
+
+    buffer<char> tmp;
+    size_t sz = a.size();
+    for (size_t i = 0; i < sz; i++) {
+        tmp.push_back(static_cast<unsigned char>(cidx(a[i])));
+    }
+    ssize_t ret = send(fd, tmp.data(), sz, 0);
+    char buf[sz + 1];
+    memcpy(buf, tmp.data(), sz);
+    buf[sz] = 0;
+    if (ret == -1) {
+        return tactic::mk_exception("raw publish failed!", tactic::to_state(s));
+    }
+    return tactic::mk_success(mk_vm_unit(), tactic::to_state(s));
+}
+
+vm_obj tactic_debug_handle_pause(vm_obj const & _h, vm_obj const & s) {
+    return tactic::mk_success(mk_vm_unit(), tactic::to_state(s));
+}
 
 void initialize_tactic_state() {
     DECLARE_VM_BUILTIN(name({"tactic_state", "env"}),            tactic_state_env);
@@ -1082,6 +1151,10 @@ void initialize_tactic_state() {
     DECLARE_VM_BUILTIN(name({"tactic", "unfreeze_local_instances"}), tactic_unfreeze_local_instances);
     DECLARE_VM_BUILTIN(name({"tactic", "frozen_local_instances"}),   tactic_frozen_local_instances);
     DECLARE_VM_BUILTIN(name({"io", "run_tactic"}),               io_run_tactic);
+
+    DECLARE_VM_BUILTIN(name({"tactic", "debug", "mk_handle"}),             tactic_debug_mk_handle);
+    DECLARE_VM_BUILTIN(name({"tactic", "debug", "handle", "publish_raw"}), tactic_debug_handle_publish_raw);
+    DECLARE_VM_BUILTIN(name({"tactic", "debug", "handle", "pause"}),       tactic_debug_handle_pause);
 }
 
 void finalize_tactic_state() {

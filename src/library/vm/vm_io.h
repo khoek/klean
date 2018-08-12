@@ -8,6 +8,7 @@ Author: Leonardo de Moura
 #include <string>
 #include <vector>
 #include "library/vm/vm.h"
+#include "library/vm/vm_array.h"
 #include "library/handle.h"
 
 namespace lean {
@@ -23,6 +24,10 @@ optional<vm_obj> is_io_error(vm_obj const & o);
 std::string io_error_to_string(vm_obj const & o);
 
 void set_io_cmdline_args(std::vector<std::string> const & args);
+
+vm_obj socket_mk_handle(const char *fname);
+vm_obj socket_recv(int fd, ssize_t num);
+vm_obj socket_send(int fd, parray<vm_obj> const & a);
 
 void initialize_vm_io();
 void finalize_vm_io();
