@@ -217,4 +217,22 @@ void push_unicode_scalar(std::string & s, unsigned code) {
         s.push_back(static_cast<unsigned char>(code & 0x3F) | TAG_CONT);
     }
 }
+
+void push_unicode_scalar(buffer<char> & b, unsigned code) {
+    if (code < MAX_ONE_B) {
+        b.push_back(static_cast<unsigned char>(code));
+    } else if (code < MAX_TWO_B) {
+        b.push_back(static_cast<unsigned char>(code >> 6 & 0x1F) | TAG_TWO_B);
+        b.push_back(static_cast<unsigned char>(code & 0x3F) | TAG_CONT);
+    } else if (code < MAX_THREE_B) {
+        b.push_back(static_cast<unsigned char>(code >> 12 & 0x0F) | TAG_THREE_B);
+        b.push_back(static_cast<unsigned char>(code >>  6 & 0x3F) | TAG_CONT);
+        b.push_back(static_cast<unsigned char>(code & 0x3F) | TAG_CONT);
+    } else {
+        b.push_back(static_cast<unsigned char>(code >> 18 & 0x07) | TAG_FOUR_B);
+        b.push_back(static_cast<unsigned char>(code >> 12 & 0x3F) | TAG_CONT);
+        b.push_back(static_cast<unsigned char>(code >>  6 & 0x3F) | TAG_CONT);
+        b.push_back(static_cast<unsigned char>(code & 0x3F) | TAG_CONT);
+    }
+}
 }

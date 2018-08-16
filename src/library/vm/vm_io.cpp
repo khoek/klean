@@ -22,6 +22,7 @@ Author: Leonardo de Moura
 #endif
 #include <util/unit.h>
 #include "util/sstream.h"
+#include "util/utf8.h"
 #include "library/handle.h"
 #include "library/io_state.h"
 #include "library/constants.h"
@@ -294,7 +295,7 @@ static vm_obj fs_write(vm_obj const & h, vm_obj const & b, vm_obj const &) {
     parray<vm_obj> const & a = to_array(cfield(b, 1));
     unsigned sz = a.size();
     for (unsigned i = 0; i < sz; i++) {
-        tmp.push_back(static_cast<unsigned char>(cidx(a[i])));
+        push_unicode_scalar(tmp, cidx(a[i]));
     }
 
     try {

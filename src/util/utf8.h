@@ -38,4 +38,7 @@ void utf8_decode(std::string const & str, buffer<unsigned> & out);
 
 /* Push a unicode scalar value into a utf-8 encoded string */
 void push_unicode_scalar(std::string & s, unsigned code);
+
+/* Push a unicode scalar value into a utf-8 encoded buffer */
+void push_unicode_scalar(buffer<char> & b, unsigned code);
 }
