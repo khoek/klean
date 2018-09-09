@@ -34,7 +34,7 @@ static std::vector<vm_obj> extra_ios;
 } while(0)
 
 bool is_extra_name(name const &n) {
-    for(name const *en : extra_names) {  
+    for(name const *en : extra_names) {
         if(n == *en) {
             return true;
         }
@@ -112,6 +112,10 @@ struct vm_array : public vm_external {
     virtual vm_external * clone(vm_clone_fn const &) override { lean_unreachable(); }
 };
 
+static vm_obj extras_revision() {
+    return mk_vm_nat(1);
+}
+
 static vm_obj extras_find_separating_hyperplane(vm_obj const & _dim, vm_obj const & _vlist_a,
     vm_obj const & _vlist_b) {
     unsigned dim = force_to_unsigned(_dim);
@@ -166,7 +170,9 @@ static vm_obj extras_greet(vm_obj const &) {
 
 void initialize_vm_extras() {
     //Pure function declarations
-    register_extra_pure(name({"extras", "find_separating_hyperplane"}),
+    register_extra_pure(name({"k", "revision"}),
+        extras_revision);
+    register_extra_pure(name({"k", "find_separating_hyperplane"}),
         extras_find_separating_hyperplane);
 
     //IO function declarations --- order MUST be as specified in extras.lean
@@ -174,8 +180,8 @@ void initialize_vm_extras() {
     //declared IO functions (else some nonsense with compound expressions happens).
     register_extra_io(extras_nop);
     register_extra_io(extras_greet);
-    
-    //Install the IO implementation, must be called after all of the calls to 
+
+    //Install the IO implementation, must be called after all of the calls to
     //register_extra_io().
     install_extra_ios();
 }
