@@ -151,6 +151,15 @@ def read_file (s : string) (bin := ff) : io char_buffer :=
 do h ← mk_file_handle s io.mode.read bin,
    read_to_end h
 
+def file_exists : string → io bool :=
+monad_io_file_system.file_exists io_core
+
+def dir_exists : string → io bool :=
+monad_io_file_system.dir_exists io_core
+
+def mkdir : string → io unit :=
+monad_io_file_system.mkdir io_core
+
 end fs
 
 namespace proc

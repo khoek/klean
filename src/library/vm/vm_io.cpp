@@ -34,6 +34,15 @@ Author: Leonardo de Moura
 #include "library/vm/vm_io.h"
 #include "library/vm/vm_list.h"
 
+#include <errno.h>
+#if defined(LEAN_WINDOWS) && !defined(LEAN_CYGWIN)
+#include <windows.h>
+#define mkdir _mkdir
+#else
+#include <limits.h>
+#include <sys/stat.h>
+#endif
+
 namespace lean {
 vm_obj io_core(vm_obj const &, vm_obj const &) {
     return mk_vm_unit();
@@ -264,6 +273,77 @@ static vm_obj fs_stderr(vm_obj const &) {
     return mk_io_result(to_obj(std::make_shared<handle>(stderr)));
 }
 
+#define FN_NEXIST 0
+#define FN_ISFILE 1
+#define FN_ISDIR  2
+
+// This should work on Windows and Unix
+static int stat_file(std::string & path) {
+    FILE *f = fopen(path.c_str(), "r+");
+    if(f) {
+        fclose(f);
+        return FN_ISFILE;
+    }
+    return errno == EISDIR ? FN_ISDIR : FN_NEXIST;
+}
+
+static vm_obj fs_file_exists(vm_obj const & _path, vm_obj const &) {
+    std::string path = to_string(_path);
+    return mk_io_result(mk_vm_bool(stat_file(path) == FN_ISFILE));
+}
+
+static vm_obj fs_dir_exists(vm_obj const & _path, vm_obj const &) {
+    std::string path = to_string(_path);
+    return mk_io_result(mk_vm_bool(stat_file(path) == FN_ISDIR));
+}
+
+/* Modified from:
+   https://gist.github.com/JonathonReinhart/8c0d90191c38af2dcadb102c4e202950 */
+static int mkdir_p(const char *path) {
+    /* Adapted from http://stackoverflow.com/a/2336245/119527 */
+    const size_t len = strlen(path);
+    char _path[PATH_MAX];
+    char *p;
+
+    errno = 0;
+
+    /* Copy string so its mutable */
+    if (len > sizeof(_path)-1) {
+        // Name too long
+        return -1;
+    }
+    strcpy(_path, path);
+
+    /* Iterate the string */
+    for (p = _path + 1; *p; p++) {
+        if (*p == '/') {
+            /* Temporarily truncate */
+            *p = '\0';
+
+            if (mkdir(_path, S_IRWXU) != 0) {
+                if (errno != EEXIST)
+                    return -1;
+            }
+
+            *p = '/';
+        }
+    }
+
+    if (mkdir(_path, S_IRWXU) != 0) {
+        if (errno != EEXIST)
+            return -1;
+    }
+
+    return 0;
+}
+
+static vm_obj fs_mkdir(vm_obj const & _path, vm_obj const &) {
+    std::string path = to_string(_path);
+    //TODO report error
+    mkdir_p(path.c_str());
+    return mk_io_result(mk_vm_unit());
+}
+
 /*
 class monad_io_file_system (m : Type → Type → Type) [monad_io m] :=
 /- Remark: in Haskell, they also provide  (Maybe TextEncoding) and  NewlineMode -/
@@ -277,6 +357,9 @@ class monad_io_file_system (m : Type → Type → Type) [monad_io m] :=
 (stdin          : m io.error (handle m))
 (stdout         : m io.error (handle m))
 (stderr         : m io.error (handle m))
+(file_exists    : string → m io.error bool)
+(dir_exists     : string → m io.error bool)
+(mkdir          : string → m io.error unit)
 */
 static vm_obj monad_io_file_system_impl () {
     return mk_vm_constructor(0, {
@@ -289,7 +372,10 @@ static vm_obj monad_io_file_system_impl () {
         mk_native_closure(fs_get_line),
         mk_native_closure(fs_stdin),
         mk_native_closure(fs_stdout),
-        mk_native_closure(fs_stderr)});
+        mk_native_closure(fs_stderr),
+        mk_native_closure(fs_file_exists),
+        mk_native_closure(fs_dir_exists),
+        mk_native_closure(fs_mkdir),});
 }
 
 stdio to_stdio(vm_obj const & o) {

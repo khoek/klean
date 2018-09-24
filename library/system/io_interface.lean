@@ -61,6 +61,9 @@ class monad_io_file_system (m : Type → Type → Type) [monad_io m] :=
 (stdin          : m io.error (handle m))
 (stdout         : m io.error (handle m))
 (stderr         : m io.error (handle m))
+(file_exists    : string → m io.error bool)
+(dir_exists     : string → m io.error bool)
+(mkdir          : string → m io.error unit)
 
 class monad_io_environment (m : Type → Type → Type) :=
 (get_env : string → m io.error (option string))
