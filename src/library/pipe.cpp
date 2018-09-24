@@ -10,6 +10,8 @@ Author: Jared Roesch
 
 
 #if defined(LEAN_WINDOWS) && !defined(LEAN_CYGWIN)
+#include <io.h>
+#include <fcntl.h>
 #else
 #include <unistd.h>
 #endif
@@ -17,16 +19,20 @@ Author: Jared Roesch
 namespace lean {
 
 pipe::pipe() {
-    #if defined(LEAN_WINDOWS) && !defined(LEAN_CYGWIN)
-    #else
     int fds[2];
+
+    #if defined(LEAN_WINDOWS) && !defined(LEAN_CYGWIN)
+    if (::pipe(fds, 4096, O_BINARY) == -1) {
+        throw exception("unable to create pipe");
+    }
+    #else
     if (::pipe(fds) == -1) {
         throw exception("unable to create pipe");
-    } else {
-        m_read_fd = fds[0];
-        m_write_fd = fds[1];
     }
     #endif
+
+    m_read_fd = fds[0];
+    m_write_fd = fds[1];
 }
 
 }
