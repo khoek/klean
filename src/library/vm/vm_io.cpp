@@ -18,6 +18,9 @@ Author: Leonardo de Moura
 #endif
 #ifdef __linux__
 #include <linux/limits.h>
+#include <limits.h>
+#include <errno.h>
+#include <sys/stat.h>
 #endif
 #include <util/unit.h>
 #include "util/sstream.h"
@@ -34,13 +37,8 @@ Author: Leonardo de Moura
 #include "library/vm/vm_io.h"
 #include "library/vm/vm_list.h"
 
-#include <errno.h>
 #if defined(LEAN_WINDOWS) && !defined(LEAN_CYGWIN)
-#include <windows.h>
-#define mkdir _mkdir
-#else
-#include <limits.h>
-#include <sys/stat.h>
+#define mkdir(path, flags) mkdir(path)
 #endif
 
 namespace lean {
